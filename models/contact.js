@@ -1,17 +1,19 @@
-const { Schema, model } = require('mongoose');
-const { handleSaveErrors } = require('../utils/');
+const { Schema, model } = require("mongoose");
+const { handleMongooseError } = require("../utils");
+
 const contactSchema = new Schema(
   {
     name: {
       type: String,
-      required: [true, 'Please set name for contact'],
-      minlegth: 3,
+      required: [true, "Set name for contact"],
     },
     email: {
       type: String,
+      required: true,
     },
     phone: {
       type: String,
+      required: true,
     },
     favorite: {
       type: Boolean,
@@ -19,8 +21,8 @@ const contactSchema = new Schema(
     },
     owner: {
       type: Schema.Types.ObjectId,
-      ref: 'user',
-      required: true,
+      ref: "user",
+      // required: true,
     },
   },
   {
@@ -28,6 +30,9 @@ const contactSchema = new Schema(
     timestamps: true,
   }
 );
-contactSchema.post('save', handleSaveErrors);
-const Contact = model('contact', contactSchema);
-module.exports = { Contact };
+
+contactSchema.post("save", handleMongooseError);
+
+const Contact = model("contact", contactSchema);
+
+module.exports = Contact;
