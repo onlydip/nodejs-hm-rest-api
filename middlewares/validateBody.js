@@ -1,13 +1,15 @@
-const { RequestError } = require('../utils');
+const { HttpError } = require("../utils");
 
 const validateBody = schema => {
   const func = (req, res, next) => {
-    const { error } = schema.validate(req.body);
+    const { error } = schema.validate(req.body, { abortEarly: true });
     if (error) {
-      next(RequestError(400, error.message));
+      console.log(error);
+      next(HttpError(400, error.message));
     }
     next();
   };
+
   return func;
 };
 
