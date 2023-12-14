@@ -14,12 +14,7 @@ app.use(logger(formatsLogger));
 app.use(cors());
 
 app.use(express.json());
-
-// health check
-// app.get("/", (req, res, next) => {
-//   res.send("Hello world");
-// });
-
+app.use(express.static("public"));
 app.use("/contacts", contactsRouter);
 app.use("/users", authRouter);
 
@@ -28,6 +23,10 @@ app.use((_, res) => {
 });
 
 app.use((err, req, res, next) => {
+  if (err.message === "Unexpected field") {
+    return res.status(400).json({ message: "Invalid body (Unexpected field)" });
+  }
+
   const { status = 500, message = "Server Error" } = err;
   res.status(status).json({ message });
 });
