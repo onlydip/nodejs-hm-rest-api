@@ -5,10 +5,11 @@ const gravatar = require("gravatar");
 const path = require("path");
 const fs = require("fs/promises");
 const Jimp = require("jimp");
+const crypto = require("node:crypto");
 
-const { HttpError, ctrlWrapper } = require("../utils");
+const { HttpError, ctrlWrapper, sendEmail } = require("../utils");
 
-const { JWT_SECRET } = process.env;
+const { JWT_SECRET, BASE_URL } = process.env;
 
 const register = async (req, res) => {
   const { email, password } = req.body;
@@ -20,14 +21,23 @@ const register = async (req, res) => {
   const hashPassword = await bcryptjs.hash(password, 10);
 
   const avatarURL = gravatar.url(email, { s: "250" });
+  const verificationToken = crypto.randomUUID();
+
+  const verifyEmail = {
+    to: email,
+    subject: "Verify email",
+    html: `<a target="_blank" href="${BASE_URL}/api/users/verify/${verificationToken}">Click verify email</a>`,
+  };
+
+  await sendEmail(verifyEmail);
 
   const newUser = await User.create({
     ...req.body,
     password: hashPassword,
     avatarURL,
+    verificationToken,
   });
 
-  console.log(newUser);
   res.status(201).json({
     email: newUser.email,
     subscription: newUser.subscription,
@@ -40,6 +50,10 @@ const login = async (req, res) => {
 
   if (!user) {
     throw HttpError(401, "Email or password is wrong!");
+  }
+
+  if (!user.verify) {
+    throw HttpError(401, "Email not verified");
   }
 
   const passwordCompare = await bcryptjs.compare(password, user.password);
@@ -60,11 +74,52 @@ const login = async (req, res) => {
   });
 };
 
+const verifyEmail = async (req, res) => {
+  const { verificationToken } = req.params;
+  const user = await User.findOne({ verificationToken });
+  if (!user) {
+    throw HttpError(404, "User not found!");
+  }
+
+  await User.findByIdAndUpdate(user._id, {
+    verify: true,
+    verificationToken: null,
+  });
+
+  res.status(200).json({
+    message: "Verification successful!!!!",
+  });
+};
+
+const resendVerifyEmail = async (req, res) => {
+  const { email } = req.body;
+  const user = await User.findOne({ email });
+  if (!user) {
+    throw HttpError(404, "Email not found!!!!");
+  }
+  if (user.verify) {
+    throw HttpError(400, "Verification has already been passed!!!");
+  }
+
+  const verifyEmail = {
+    to: email,
+    subject: "Verify email via link",
+    html: `<a target="_blank" href="${BASE_URL}/api/users/verify/${user.verificationToken}">Click to verify your email</a>`,
+  };
+
+  await sendEmail(verifyEmail);
+
+  res.status(200).json({
+    message: "Verification email sent!",
+  });
+};
+
 const getCurrent = async (req, res) => {
   const { email, subscription, token } = req.user;
 
   res.status(200).json({
     user: { email, subscription },
+
     token,
   });
 };
@@ -74,7 +129,6 @@ const logout = async (req, res) => {
   await User.findByIdAndUpdate(_id, { token: "" });
 
   res.status(204).end();
-
 };
 
 const subscription = async (req, res) => {
@@ -109,6 +163,7 @@ const updateAvatar = async (req, res) => {
       .cover(250, 250, Jimp.VERTICAL_ALIGN_MIDDLE)
       .write(fileDir);
   };
+
   const { path: tempURL, filename } = req.file;
 
   await resize(tempURL);
@@ -130,6 +185,7 @@ const updateAvatar = async (req, res) => {
 
 const getAvatar = async (req, res) => {
   console.log(req.user);
+
   const user = await User.findById(req.user._id).exec();
   if (user === null) {
     return res.status(404).send({ message: "User not found" });
@@ -150,4 +206,6 @@ module.exports = {
   subscription: ctrlWrapper(subscription),
   updateAvatar: ctrlWrapper(updateAvatar),
   getAvatar: ctrlWrapper(getAvatar),
+  verifyEmail: ctrlWrapper(verifyEmail),
+  resendVerifyEmail: ctrlWrapper(resendVerifyEmail),
 };
