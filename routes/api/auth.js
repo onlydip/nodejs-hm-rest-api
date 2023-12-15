@@ -9,14 +9,14 @@ const {
   registerJoiSchema,
   loginJoiSchema,
   subscriptionJoiSchema,
+  emailSchema,
 } = require("../../schemas/users");
 const ctrl = require("../../controllers/auth");
 const router = express.Router();
-
-
 router.post("/register", validateBody(registerJoiSchema), ctrl.register);
-
 router.post("/login", validateBody(loginJoiSchema), ctrl.login);
+router.get("/verify/:verificationToken", ctrl.verifyEmail);
+router.post("/verify", validateBody(emailSchema), ctrl.resendVerifyEmail);
 
 router.get("/current", authenticate, ctrl.getCurrent);
 
